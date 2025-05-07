@@ -11,13 +11,17 @@ let cachedClient = null;
 /**
  * Conecta a la base de datos y reutiliza la conexión si es posible.
  */
+
 async function connectToDatabase() {
-  // Verifica que cachedClient exista y esté conectado.
-  if (cachedClient && cachedClient.topology && cachedClient.topology.isConnected()) {
-    return cachedClient;
-  }
-  const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-  cachedClient = await client.connect();
+  if (cachedClient) return cachedClient;
+
+  const client = new MongoClient(uri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+
+  await client.connect();
+  cachedClient = client;
   return cachedClient;
 }
 
