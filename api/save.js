@@ -1,12 +1,18 @@
-// api/save.js
 const { MongoClient } = require("mongodb");
 
-// La conexión se obtiene de una variable de entorno; asegúrate de configurarla en Vercel.
-const uri = process.env.MONGODB_URI;
+// Verifica que la variable de entorno esté definida
+if (!process.env.MONGODB_URI) {
+  throw new Error("Please define the MONGODB_URI environment variable");
+}
 
+const uri = process.env.MONGODB_URI;
 let cachedClient = null;
 
+/**
+ * Conecta a la base de datos y reutiliza la conexión si es posible.
+ */
 async function connectToDatabase() {
+  // Verifica que cachedClient exista y esté conectado.
   if (cachedClient && cachedClient.topology && cachedClient.topology.isConnected()) {
     return cachedClient;
   }
@@ -15,19 +21,26 @@ async function connectToDatabase() {
   return cachedClient;
 }
 
+/**
+ * Handler principal del endpoint.
+ * Se espera que se invoque únicamente con el método POST y un JSON que contenga { text }.
+ */
 module.exports = async (req, res) => {
+  // Permitir únicamente el método POST
   if (req.method !== "POST") {
     res.status(405).json({ success: false, error: "Method Not Allowed" });
     return;
   }
+
   const { text } = req.body;
   if (!text) {
     res.status(400).json({ success: false, error: "El campo 'text' es requerido" });
     return;
   }
+
   try {
     const client = await connectToDatabase();
-    const db = client.db("pwa");
+    const db = client.db("pwa"); // Asegúrate de que la base de datos se llame "pwa" o cámbiala según corresponda
     const collection = db.collection("reports");
     const data = { text, date: new Date() };
     const result = await collection.insertOne(data);
