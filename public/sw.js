@@ -11,7 +11,8 @@ const urlsToCache = [
 self.addEventListener('install', (event) => {
   console.log('[SW] Instalando');
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(urlsToCache))
   );
 });
 
@@ -28,8 +29,17 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Si la solicitud es para el manifest, se hace fetch con las credenciales necesarias sin pasar por la lógica de cacheo.
+  if (event.request.url.endsWith('/manifest.json')) {
+    event.respondWith(
+      fetch(event.request, { credentials: 'same-origin' })
+    );
+    return;
+  }
+  
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request, { credentials: 'same-origin' })
+      .catch(() => caches.match(event.request))
   );
 });
 
@@ -75,7 +85,7 @@ async function syncData() {
           // Muestra una notificación push indicando la sincronización exitosa
           self.registration.showNotification('Sincronización completada', {
             body: 'Tus datos se han actualizado en línea en MongoDB.',
-            icon: '/icons/icon-192x192.png'  // (Opcional) Icono para la notificación
+            icon: '/icons/icon-192x192.png'
           });
           resolve();
         };
