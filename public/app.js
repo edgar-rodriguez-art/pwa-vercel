@@ -85,30 +85,41 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   
-    // Sincroniza los datos de IndexedDB con el servidor
     async function syncOfflineData() {
-      const db = await openDatabase();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction('pendingData', 'readwrite');
-        const store = tx.objectStore('pendingData');
-        const getAll = store.getAll();
-        getAll.onsuccess = async () => {
-          const offlineData = getAll.result;
-          if (offlineData.length > 0) {
-            for (const text of offlineData) {
-              await sendData(text);
+        const db = await openDatabase();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('pendingData', 'readwrite');
+          const store = tx.objectStore('pendingData');
+          const getAll = store.getAll();
+      
+          getAll.onsuccess = () => {
+            const offlineData = getAll.result;
+            if (offlineData.length > 0) {
+              const promises = offlineData.map((text) => sendData(text));
+              Promise.all(promises)
+                .then(() => {
+                  const clearTx = db.transaction('pendingData', 'readwrite');
+                  const clearStore = clearTx.objectStore('pendingData');
+                  const clearRequest = clearStore.clear();
+                  clearRequest.onsuccess = () => {
+                    console.log('Datos offline sincronizados y limpiados.');
+                    resolve();
+                  };
+                  clearRequest.onerror = () => reject('Error al limpiar datos offline');
+                })
+                .catch(err => {
+                  console.error('Error al enviar algunos datos offline:', err);
+                  reject(err);
+                });
+            } else {
+              resolve(); // No hay datos que sincronizar
             }
-            const clearRequest = store.clear();
-            clearRequest.onsuccess = () => {
-              console.log('Datos offline sincronizados y limpiados.');
-              resolve();
-            };
-            clearRequest.onerror = () => reject('Error al limpiar datos offline');
-          } else resolve();
-        };
-        getAll.onerror = () => reject('Error al obtener datos offline');
-      });
-    }
+          };
+      
+          getAll.onerror = () => reject('Error al obtener datos offline');
+        });
+      }
+      
   
     // Registra Background Sync en el Service Worker
     function registerBackgroundSync() {
