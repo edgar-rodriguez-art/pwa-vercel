@@ -60,43 +60,57 @@ function openDatabase() {
 
 // Función para sincronizar los datos offline en el SW
 async function syncData() {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('pendingData', 'readwrite');
-    const store = tx.objectStore('pendingData');
-    const getAll = store.getAll();
-    getAll.onsuccess = async () => {
-      const offlineData = getAll.result;
-      if (offlineData.length) {
-        for (const text of offlineData) {
+    const db = await openDatabase();
+  
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('pendingData', 'readonly');
+      const store = tx.objectStore('pendingData');
+      const getAll = store.getAll();
+  
+      getAll.onsuccess = async () => {
+        const offlineData = getAll.result;
+  
+        if (offlineData.length) {
           try {
-            await fetch('/api/save', { 
-              method: 'POST',
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ text })
-            });
+            //  Primero se envían todos los datos
+            for (const text of offlineData) {
+              await fetch('/api/save', {
+                method: 'POST',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text })
+              });
+            }
+  
+            //  Ahora una NUEVA transacción para hacer el clear()
+            const deleteTx = db.transaction('pendingData', 'readwrite');
+            const deleteStore = deleteTx.objectStore('pendingData');
+            const clearRequest = deleteStore.clear();
+  
+            clearRequest.onsuccess = () => {
+              console.log('Datos offline sincronizados y limpiados.');
+  
+              self.registration.showNotification('Sincronización completada', {
+                body: 'Tus datos se han actualizado en línea en MongoDB.',
+                icon: '/icons/icon-192x192.png'
+              });
+  
+              resolve();
+            };
+  
+            clearRequest.onerror = () => reject('Error al limpiar datos offline en SW');
           } catch (err) {
             console.error('Error durante la sincronización en SW:', err);
+            reject(err);
           }
+        } else {
+          resolve(); // No hay nada que sincronizar
         }
-        const clearRequest = store.clear();
-        clearRequest.onsuccess = () => {
-          console.log('Datos offline sincronizados y limpiados.');
-          // Muestra una notificación push indicando la sincronización exitosa
-          self.registration.showNotification('Sincronización completada', {
-            body: 'Tus datos se han actualizado en línea en MongoDB.',
-            icon: '/icons/icon-192x192.png'
-          });
-          resolve();
-        };
-        clearRequest.onerror = () => reject('Error al limpiar datos offline en SW');
-      } else {
-        resolve();
-      }
-    };
-    getAll.onerror = () => reject('Error al obtener datos offline en SW');
-  });
-}
+      };
+  
+      getAll.onerror = () => reject('Error al obtener datos offline en SW');
+    });
+  }
+  
 
 // Escucha el evento de Background Sync
 self.addEventListener('sync', (event) => {
