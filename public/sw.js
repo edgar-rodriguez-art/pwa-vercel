@@ -89,13 +89,7 @@ async function syncData() {
             clearRequest.onsuccess = () => {
               console.log('Datos offline sincronizados y limpiados.');
   
-              if (Notification.permission === 'granted') {
-                self.registration.showNotification('Sincronización completada', {
-                  body: 'Tus datos se han actualizado en línea en MongoDB.',
-                  icon: '/icons/icon-192x192.png'
-                });
-              }
-  
+             
               resolve();
             };
   
